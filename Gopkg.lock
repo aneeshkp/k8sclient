@@ -390,7 +390,9 @@
   input-imports = [
     "k8s.io/apimachinery/pkg/apis/meta/v1",
     "k8s.io/client-go/kubernetes",
+    "k8s.io/client-go/rest",
     "k8s.io/client-go/tools/clientcmd",
+    "k8s.io/klog",
   ]
   solver-name = "gps-cdcl"
   solver-version = 1
