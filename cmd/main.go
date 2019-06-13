@@ -5,20 +5,23 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"io/ioutil"
+	"log"
 	"os"
 	"os/user"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"time"
-	"k8s.io/client-go/helm"
-	corev1 "k8s.io/api/core/v1"
+
+	"k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1" //"k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog"
-	"k8s.io/api/extensions/v1beta1"
-	"k8s.io/client-go/kubernetes/scheme"
 )
 
 var (
@@ -28,7 +31,6 @@ var (
 
 type Clients struct {
 	kubeClient *kubernetes.Clientset
-	helmClient *helm
 }
 
 func init() {
@@ -39,6 +41,9 @@ func init() {
 			"Only required if out-of-cluster.")
 }
 func main() {
+	CreateDeploymentFromHelmChart()
+}
+func _() {
 
 	flag.Parse()
 	// uses the current context in kubeconfig
@@ -100,37 +105,81 @@ func main() {
 	}
 
 }
-func (c *Clients) createDeploymentFromHelmChart() {
+func CreateDeploymentFromHelmChart() {
+
+	//files, err := ioutil.ReadDir("./helmcharts/ngnix/templates")
+	files, err := ioutil.ReadDir("./resources/")
+	if err != nil {
+		log.Fatal(err)
+	}
+	acceptedK8sTypes := regexp.MustCompile(`(Role|ClusterRole|RoleBinding|ClusterRoleBinding|ServiceAccount|Service|Deployment)`)
 	//for _, f := range yamlFiles {
-		decode := api.Codecs.UniversalDeserializer().Decode
-		obj, groupVersionKind, err := decode([]byte(f), nil, nil)
+	for _, f := range files {
+		decode := scheme.Codecs.UniversalDeserializer().Decode
+		fmt.Println("******************")
+		fmt.Println(f.Name())
+		fmt.Println("******************")
+		fileBytes, err := ioutil.ReadFile(filepath.Join("./resources/", f.Name()))
+		obj, groupVersionKind, err := decode([]byte(fileBytes), nil, nil)
 		if err != nil {
 			log.Fatal(fmt.Sprintf("Error while decoding YAML object. Err was: %s", err))
 		}
+		if !acceptedK8sTypes.MatchString(groupVersionKind.Kind) {
+			fmt.Println("Error while decoding, its not in acceptable list")
+		} else {
+			fmt.Printf("%#v\n", groupVersionKind.Kind)
+			// now use switch over the type of the object
+			// and match each type-case
+			//switch o := obj.(type) {
+			switch groupVersionKind.Kind {
+			//case *corev1.Pod:
+			case "Pod":
+				fmt.Println("Pod")
+				// o is a pod
+			//case *v1.Role:
+			case "Role":
+				// o is the actual role Object with all fields etc
+				fmt.Println("Role")
+			//case *v1.RoleBinding:
+			case "RoleBinding":
+				fmt.Println("Role Binding")
+			//case *v1.ClusterRole:
+			case "ClusterRole":
+				fmt.Println("Cluster Role")
+			//case *v1.ClusterRoleBinding:
+			case "ClusterRoleBinding":
+				fmt.Println("Role Binding")
+			//case *corev1.ServiceAccount:
+			case "ServiceAccount":
+				serviceAccount := obj.(*corev1.ServiceAccount)
+				fmt.Printf("%+v\n", serviceAccount)
+				fmt.Println("******************")
+				fmt.Println("")
+			case "Service":
+				service := obj.(*corev1.Service)
+				fmt.Printf("%+v\n", service)
+				fmt.Println("******************")
+				fmt.Println("")
+			//case *v1beta1.Deployment:
+			case "Deployment":
 
-	// now use switch over the type of the object
-	// and match each type-case
-	switch o := obj.(type) {
-	case *v1.Pod:
-		// o is a pod
-	case *v1beta1.Role:
-		// o is the actual role Object with all fields etc
-	case *v1beta1.RoleBinding:
-	case *v1beta1.ClusterRole:
-	case *v1beta1.ClusterRoleBinding:
-	case *v1.ServiceAccount:
-	case *v1beta1.Deployment:
-		obj, _, err := decode([]byte(json), nil, nil)
-		if err != nil {
-			fmt.Printf("%#v", err)
+				deployment := &v1.Deployment{}
+				deployment = obj.(*v1.Deployment)
+				fmt.Printf("%+v\n", deployment)
+
+				fmt.Println("******************")
+				fmt.Println("")
+			default:
+				//o is unknown for us
+
+				fmt.Printf("%+v\n", groupVersionKind.Kind)
+
+				fmt.Println("UnKnow")
+			}
+
 		}
 
-		deployment := obj.(*v1beta1.Deployment)
-		fmt.Printf("%#v\n", deployment)
-	default:
-		//o is unknown for us
 	}
-
 
 }
 
