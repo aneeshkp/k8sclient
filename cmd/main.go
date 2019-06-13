@@ -10,13 +10,15 @@ import (
 	"path/filepath"
 	"strconv"
 	"time"
-
+	"k8s.io/client-go/helm"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog"
+	"k8s.io/api/extensions/v1beta1"
+	"k8s.io/client-go/kubernetes/scheme"
 )
 
 var (
@@ -26,6 +28,7 @@ var (
 
 type Clients struct {
 	kubeClient *kubernetes.Clientset
+	helmClient *helm
 }
 
 func init() {
@@ -87,12 +90,47 @@ func main() {
 		panic(err.Error())
 	}
 
-	pod := clients.createPod("puttur")
+	/*pod := clients.createPod("puttur")
 	time.Sleep(10 * time.Second)
 	clients.printPodLogs(*pod)
+	*/
 	for _, pod := range pods.Items {
 		fmt.Println(pod.Name, pod.Status.PodIP)
+		clients.printPodLogs(pod)
 	}
+
+}
+func (c *Clients) createDeploymentFromHelmChart() {
+	//for _, f := range yamlFiles {
+		decode := api.Codecs.UniversalDeserializer().Decode
+		obj, groupVersionKind, err := decode([]byte(f), nil, nil)
+		if err != nil {
+			log.Fatal(fmt.Sprintf("Error while decoding YAML object. Err was: %s", err))
+		}
+
+	// now use switch over the type of the object
+	// and match each type-case
+	switch o := obj.(type) {
+	case *v1.Pod:
+		// o is a pod
+	case *v1beta1.Role:
+		// o is the actual role Object with all fields etc
+	case *v1beta1.RoleBinding:
+	case *v1beta1.ClusterRole:
+	case *v1beta1.ClusterRoleBinding:
+	case *v1.ServiceAccount:
+	case *v1beta1.Deployment:
+		obj, _, err := decode([]byte(json), nil, nil)
+		if err != nil {
+			fmt.Printf("%#v", err)
+		}
+
+		deployment := obj.(*v1beta1.Deployment)
+		fmt.Printf("%#v\n", deployment)
+	default:
+		//o is unknown for us
+	}
+
 
 }
 
